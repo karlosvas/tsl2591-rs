@@ -9,11 +9,26 @@
 //! If you find this useful, consider supporting Adafruit's open source hardware:
 //! <https://www.adafruit.com/products/1980>
 
-pub enum Error<E> {
-    // Error with I2C bus — wrappea el error del trait embedded-hal
+/// Errors that can occur when interacting with the TSL2591 sensor
+#[derive(Debug)]
+pub enum Tsl2591Error<E> {
+    /// I2C communication error
+    ///
+    /// This wraps the error type from the underlying [`embedded_hal::i2c::I2c`] implementation.
     I2c(E),
-    // The device ID doesn't match the expected value
+
+    /// The device ID doesn't match the expected value
+    ///
+    /// The TSL2591 should return `0x50` when reading the `DeviceID` register.
+    /// This error indicates the sensor might not be connected or is not a TSL2591.
+    ///
+    /// # Arguments
+    /// * `0` - The actual ID read from the sensor
     InvalidDevice(u8),
-    // Saturated sensor reading — the value is too high to be represented
+
+    /// Saturated sensor reading
+    ///
+    /// The light level is too high to be represented (value reached `0xFFFF`).
+    /// Try reducing gain or integration time.
     Overflow,
 }

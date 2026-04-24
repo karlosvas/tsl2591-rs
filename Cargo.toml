@@ -2,6 +2,13 @@
 name = "tsl2591-rs"
 version = "0.1.0"
 edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Carlos Vásquez <carlosvassan@email.com>"]
+description = "Platform-agnostic driver for the TSL2591 high dynamic range digital light sensor"
+repository = "https://github.com/karlosvas/tsl2591-rs"
+readme = "README.md"
+keywords = ["tsl2591", "sensor", "embedded-hal", "i2c", "light-sensor"]
+categories = ["embedded", "hardware-support", "no-std"]
 
 [dependencies]
 embedded-hal = "1.0"

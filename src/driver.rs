@@ -9,7 +9,7 @@
 //! If you find this useful, consider supporting Adafruit's open source hardware:
 //! <https://www.adafruit.com/products/1980>
 
-pub use crate::error::Error;
+pub use crate::error::Tsl2591Error;
 use crate::registers::{Gain, IntegrationTime, Persist, Register};
 use embedded_hal::i2c::I2c;
 use std::{thread, time::Duration};
@@ -39,24 +39,44 @@ pub(crate) const TSL2591_LUX_COEFC: f32 = 0.59;
 /// CH2 coefficient B
 pub(crate) const TSL2591_LUX_COEFD: f32 = 0.86;
 
+/// Main driver structure for the TSL2591 light sensor
+///
+/// This struct holds the I2C bus, sensor configuration, and state.
+/// It is generic over any I2C implementation that implements [`embedded_hal::i2c::I2c`].
 pub struct AdafruitTSL2591<I2C> {
+    /// I2C bus instance
     i2c: I2C,
+    /// Sensor identifier (user-assignable)
     sensor_id: i32,
+    /// Integration time setting
     integration: IntegrationTime,
+    /// Gain setting
     gain: Gain,
+    /// I2C address of the sensor (default 0x29)
     addr: u8,
+    /// Whether the sensor has been successfully initialized
     initialized: bool,
 }
 
+/// Light sensor reading containing lux and raw channel values
+///
+/// Returned by [`get_event`](AdafruitTSL2591::get_event) after a successful measurement.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SensorReading {
-    lux: f32,
-    full_spectrum: u16,
-    infrared: u16,
+    /// Calculated illuminance in lux
+    pub lux: f32,
+    /// Raw full spectrum value (channel 0: visible + infrared)
+    pub full_spectrum: u16,
+    /// Raw infrared value (channel 1: infrared only)
+    pub infrared: u16,
 }
 
+/// Type of physical sensor
+///
+/// Used in [`SensorInfo`] to identify what the sensor measures.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[allow(missing_docs)]
 pub enum SensorType {
+    /// Light sensor (measures illuminance in lux)
     Light,
 }
 
@@ -82,6 +102,7 @@ pub struct SensorInfo {
 }
 
 impl<I2C: I2c> AdafruitTSL2591<I2C> {
+    /// Constructor of [`AdafruitTSL2591`]
     pub fn new(i2c: I2C, integration: IntegrationTime, gain: Gain, addr: u8) -> Self {
         AdafruitTSL2591 {
             i2c,
@@ -188,11 +209,11 @@ impl<I2C: I2c> AdafruitTSL2591<I2C> {
     /// Setups the I2C interface and hardware, identifies if chip is found
     /// addr The I2C adress of the sensor (Default 0x29)
     /// True if a TSL2591 is found, false on any failure
-    fn begin(&mut self) -> Result<(), Error<I2C::Error>> {
+    fn begin(&mut self) -> Result<(), Tsl2591Error<I2C::Error>> {
         let id: u8 = self.read8(crate::registers::TSL2591_COMMAND_BIT | Register::DeviceID as u8);
 
         if id != 0x50 {
-            return Err(Error::InvalidDevice(id));
+            return Err(Tsl2591Error::InvalidDevice(id));
         }
 
         self.initialized = true;
@@ -212,9 +233,9 @@ impl<I2C: I2c> AdafruitTSL2591<I2C> {
     /// ch0 Data from channel 0 (IR+Visible)
     /// ch1 Data from channel 1 (IR)
     /// returns Lux, based on AMS coefficients (or < 0 if overflow)
-    fn calculate_lux(&mut self, ch0: u16, ch1: u16) -> Result<f32, Error<I2C::Error>> {
+    fn calculate_lux(&mut self, ch0: u16, ch1: u16) -> Result<f32, Tsl2591Error<I2C::Error>> {
         if (ch0 == 0xFFFF) || (ch1 == 0xFFFF) {
-            return Err(Error::Overflow);
+            return Err(Tsl2591Error::Overflow);
         }
 
         // Note: This algorithm is based on preliminary coefficients
@@ -361,7 +382,7 @@ impl<I2C: I2c> AdafruitTSL2591<I2C> {
     // @param  event Pointer to Adafruit_Sensor sensors_event_t object that will be
     // filled with sensor data
     // @return True on success, False on failure
-    fn get_event(&mut self) -> Result<SensorReading, Error<I2C::Error>> {
+    fn get_event(&mut self) -> Result<SensorReading, Tsl2591Error<I2C::Error>> {
         self.get_full_luminosity();
         // Early silicon seems to have issues when there is a sudden jump in */
         // light levels. :( To work around this for now sample the sensor 2x */
