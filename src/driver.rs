@@ -83,7 +83,7 @@ pub enum SensorType {
 }
 
 #[derive(Debug, Clone)]
-/// Heredated data from abstract Adafruit_Sensor
+/// Inherited from abstract Adafruit_Sensor
 pub struct SensorInfo {
     /// Name of sensor device
     pub name: &'static str,
@@ -121,8 +121,8 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
         return self.gain;
     }
 
-    fn set_gain(&mut self, new_gain: Gain) {
-        self.enable();
+    fn set_gain(&mut self, new_gain: Gain) -> Result<(), Tsl2591Error<I2C::Error>> {
+        self.enable()?;
 
         self.gain = new_gain;
 
@@ -131,17 +131,22 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
         self.write8(
             crate::registers::TSL2591_COMMAND_BIT | Register::Control as u8,
             Some(integration | gain),
-        );
+        )?;
 
-        self.disable();
+        self.disable()?;
+
+        Ok(())
     }
 
     fn get_timing(&self) -> IntegrationTime {
         return self.integration;
     }
 
-    fn set_timing(&mut self, new_integration: IntegrationTime) {
-        self.enable();
+    fn set_timing(
+        &mut self,
+        new_integration: IntegrationTime,
+    ) -> Result<(), Tsl2591Error<I2C::Error>> {
+        self.enable()?;
 
         self.integration = new_integration;
 
@@ -150,9 +155,11 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
         self.write8(
             crate::registers::TSL2591_COMMAND_BIT | Register::Control as u8,
             Some(integration as u8 | gain as u8),
-        );
+        )?;
 
-        self.disable();
+        self.disable()?;
+
+        Ok(())
     }
 
     fn get_addr(&self) -> u8 {
@@ -163,20 +170,33 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
         self.addr = addr;
     }
 
-    fn write8(&mut self, register: u8, value_optional: Option<u8>) {
+    fn write8(
+        &mut self,
+        register: u8,
+        value_optional: Option<u8>,
+    ) -> Result<(), Tsl2591Error<I2C::Error>> {
         match value_optional {
-            Some(value) => self.i2c.write(self.addr, &[register, value]),
-            None => self.i2c.write(self.addr, &[register]),
+            Some(value) => self
+                .i2c
+                .write(self.addr, &[register, value])
+                .map_err(Tsl2591Error::I2c)?,
+            None => self
+                .i2c
+                .write(self.addr, &[register])
+                .map_err(Tsl2591Error::I2c)?,
         };
+        Ok(())
     }
 
-    fn read8(&mut self, register: u8) -> u8 {
+    fn read8(&mut self, register: u8) -> Result<u8, Tsl2591Error<I2C::Error>> {
         let write_buf: [u8; 1] = [register];
         let mut read_buf: [u8; 1] = [0u8; 1];
 
-        self.i2c.write_read(self.addr, &write_buf, &mut read_buf);
+        self.i2c
+            .write_read(self.addr, &write_buf, &mut read_buf)
+            .map_err(Tsl2591Error::I2c);
 
-        read_buf[0]
+        Ok(read_buf[0])
     }
 
     fn read16(&mut self, register: u8) -> u16 {
@@ -189,7 +209,7 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
     }
 
     /// Enables the chip, so it's ready to take readings
-    fn enable(&mut self) {
+    fn enable(&mut self) -> Result<(), Tsl2591Error<I2C::Error>> {
         self.write8(
             crate::registers::TSL2591_COMMAND_BIT | Register::Enable as u8,
             Some(
@@ -198,22 +218,27 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
                     | crate::registers::TSL2591_ENABLE_AIEN
                     | crate::registers::TSL2591_ENABLE_NPIEN,
             ),
-        );
+        )?;
+
+        Ok(())
     }
 
     /// Disables the chip, so it's in power down mode
-    fn disable(&mut self) {
+    fn disable(&mut self) -> Result<(), Tsl2591Error<I2C::Error>> {
         self.write8(
             crate::registers::TSL2591_COMMAND_BIT | Register::Enable as u8,
             Some(crate::registers::TSL2591_ENABLE_POWEROFF),
-        );
+        )?;
+
+        Ok(())
     }
 
     /// Setups the I2C interface and hardware, identifies if chip is found
     /// addr The I2C adress of the sensor (Default 0x29)
     /// True if a TSL2591 is found, false on any failure
-    fn begin(&mut self) -> Result<(), Tsl2591Error<I2C::Error>> {
-        let id: u8 = self.read8(crate::registers::TSL2591_COMMAND_BIT | Register::DeviceID as u8);
+    pub fn begin(&mut self) -> Result<(), Tsl2591Error<I2C::Error>> {
+        let id: u8 =
+            self.read8(crate::registers::TSL2591_COMMAND_BIT | Register::DeviceID as u8)?;
 
         if id != 0x50 {
             return Err(Tsl2591Error::InvalidDevice(id));
@@ -225,7 +250,7 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
         self.set_timing(integration);
 
         let gain: Gain = self.gain;
-        self.set_gain(gain);
+        self.set_gain(gain)?;
 
         self.disable();
 
@@ -233,10 +258,20 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
     }
 
     /// Calculates the visible Lux based on the two light sensors
-    /// ch0 Data from channel 0 (IR+Visible)
-    /// ch1 Data from channel 1 (IR)
-    /// returns Lux, based on AMS coefficients (or < 0 if overflow)
-    fn calculate_lux(&mut self, ch0: u16, ch1: u16) -> Result<f32, Tsl2591Error<I2C::Error>> {
+    ///
+    /// # Arguments
+    ///
+    /// * `ch0` - Data from channel 0 (IR+Visible)
+    /// * `ch1` - Data from channel 1 (IR)
+    ///
+    /// # Returns
+    ///
+    /// Lux value based on AMS coefficients, or [`Tsl2591Error::Overflow`] if sensor is saturated
+    fn calculate_lux(
+        &mut self,
+        ch0: u16,
+        ch1: u16,
+    ) -> Result<f32, Tsl2591Error<Tsl2591Error<I2C::Error>>> {
         if (ch0 == 0xFFFF) || (ch1 == 0xFFFF) {
             return Err(Tsl2591Error::Overflow);
         }
@@ -304,8 +339,14 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
     }
 
     /// Reads the raw data from the channel
-    /// channel Can be 0 (IR+Visible, 1 (IR) or 2 (Visible only)
-    /// returns 16-bit raw count, or 0 if channel is invalid
+    ///
+    /// # Arguments
+    ///
+    /// * `channel` - Can be 0 (IR+Visible, 1 (IR) or 2 (Visible only)
+    ///
+    /// # Returns
+    ///
+    /// 16-bit raw count, or 0 if channel is invalid
     fn get_luminosity(&mut self, channel: u8) -> u16 {
         let full_luminosity: u32 = self.get_full_luminosity();
 
@@ -326,14 +367,13 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
         }
     }
 
-    /// Set up the interrupt to go off when light level is outside the
-    /// lower/upper range.
-    /// param  lowerThreshold Raw light data reading level that is the lower value
-    /// threshold for interrupt
-    /// param  upperThreshold Raw light data reading level that is the higher value
-    /// threshold for interrupt
-    /// param  persist How many counts we must be outside range for interrupt to
-    /// fire, default is any single value
+    /// Set up the interrupt to go off when light level is outside the lower/upper range.
+    ///
+    /// # Arguments
+    ///
+    /// * `lower_threshold` - Raw light data reading level that is the lower value threshold for interrupt
+    /// * `upper_threshold` - Raw light data reading level that is the higher value threshold for interrupt
+    /// * `persist` - How many counts we must be outside range for interrupt to fire
     fn register_interrupt(&mut self, lower_threshold: u16, upper_threshold: u16, persist: Persist) {
         self.enable();
 
@@ -370,22 +410,24 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
     /// Gets the most recent sensor event from the hardware status register.
     /// return Sensor status as a byte. Bit 0 is ALS Valid. Bit 4 is ALS Interrupt.
     /// Bit 5 is No-persist Interrupt.
-    fn get_status(&mut self) -> u8 {
-        self.enable();
+    fn get_status(&mut self) -> Result<u8, Tsl2591Error<I2C::Error>> {
+        self.enable()?;
 
         let x: u8 =
-            self.read8(crate::registers::TSL2591_COMMAND_BIT | Register::DeviceStatus as u8);
+            self.read8(crate::registers::TSL2591_COMMAND_BIT | Register::DeviceStatus as u8)?;
 
-        self.disable();
+        self.disable()?;
 
-        x
+        Ok(x)
     }
 
     /// Gets the most recent sensor event
-    // @param  event Pointer to Adafruit_Sensor sensors_event_t object that will be
-    // filled with sensor data
-    // @return True on success, False on failure
-    fn get_event(&mut self) -> Result<SensorReading, Tsl2591Error<I2C::Error>> {
+    /// event Pointer to Adafruit_Sensor sensors_event_t object that will be filled with sensor data
+    ///
+    /// # Return
+    ///
+    /// True on success, False on failure
+    pub fn get_event(&mut self) -> Result<SensorReading, Tsl2591Error<Tsl2591Error<I2C::Error>>> {
         self.get_full_luminosity();
         // Early silicon seems to have issues when there is a sudden jump in */
         // light levels. :( To work around this for now sample the sensor 2x */
@@ -401,10 +443,17 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
         })
     }
 
-    ///Gets the overall sensor_t data including the type, range and
-    //    resulution
-    //     @param  sensor Pointer to Adafruit_Sensor sensor_t object that will be
-    //    filled with sensor type data
+    /// Returns static metadata about the sensor: name, type, measurement range and resolution.
+    ///
+    /// This follows the [Adafruit_Sensor](https://github.com/adafruit/Adafruit_Sensor) abstraction pattern,
+    /// where every sensor exposes a common interface for discoverability.
+    ///
+    /// In a future version this will be part of a `AdafruitSensor` trait, allowing
+    /// generic code to work with multiple sensor types uniformly.
+    ///
+    /// # Returns
+    ///
+    /// A [`SensorInfo`] struct with the static capabilities of the TSL2591.
     fn get_sensor(&self) -> SensorInfo {
         SensorInfo {
             name: "TSL2591",
