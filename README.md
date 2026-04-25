@@ -7,13 +7,13 @@ This project is a Rust port inspired by the Adafruit TSL2591 library.
 
 ## Features
 
-- TSL2591 register map and constants
+- Public sensor configuration types and default I2C address (`Gain`, `IntegrationTime`, `Persist`, `TSL2591_ADDR`)
 - Sensor configuration enums:
   - Integration time
   - Gain
   - Interrupt persistence
-- Driver type generic over any I2C implementation compatible with `embedded-hal` 1.0
-- Error type for invalid device ID and sensor overflow
+- Driver type generic over I2C and delay providers compatible with `embedded-hal` 1.0
+- Error type for invalid device ID, sensor overflow, and I2C communication errors
 
 ## Project Status
 
@@ -31,7 +31,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tsl2591-rs = "0.1"
+tsl2591-rs = "0.1.1"
 ```
 
 ## Quick Start (Current Public Surface)
@@ -40,14 +40,22 @@ At the moment, the public constructor is available. A full end-to-end read examp
 
 ```rust
 use tsl2591_rs::driver::AdafruitTSL2591;
-use tsl2591_rs::registers::{Gain, IntegrationTime, TSL2591_ADDR};
+use tsl2591_rs::{Gain, IntegrationTime, TSL2591_ADDR};
 
 // `i2c` is any type implementing embedded_hal::i2c::I2c.
-fn create_driver<I2C>(i2c: I2C) -> AdafruitTSL2591<I2C>
+// `delay` is any type implementing embedded_hal::delay::DelayNs.
+fn create_driver<I2C, D>(i2c: I2C, delay: D) -> AdafruitTSL2591<I2C, D>
 where
-    I2C: embedded_hal::i2c::I2c,
+  I2C: embedded_hal::i2c::I2c,
+  D: embedded_hal::delay::DelayNs,
 {
-    AdafruitTSL2591::new(i2c, IntegrationTime::OneHundredMS, Gain::Medium, TSL2591_ADDR)
+  AdafruitTSL2591::new(
+    i2c,
+    delay,
+    IntegrationTime::OneHundredMS,
+    Gain::Medium,
+    TSL2591_ADDR,
+  )
 }
 ```
 

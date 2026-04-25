@@ -11,7 +11,7 @@
 
 pub use crate::error::Tsl2591Error;
 use crate::registers::{Gain, IntegrationTime, Persist, Register};
-use embedded_hal::delay::{self, DelayNs};
+use embedded_hal::delay::DelayNs;
 use embedded_hal::i2c::I2c;
 
 const TSL2591_FULLSPECTRUM: u8 = 0;

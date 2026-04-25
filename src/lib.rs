@@ -14,3 +14,5 @@
 pub mod driver;
 mod error;
 mod registers;
+
+pub use crate::registers::{Gain, IntegrationTime, Persist, TSL2591_ADDR};
