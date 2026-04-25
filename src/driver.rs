@@ -11,8 +11,8 @@
 
 pub use crate::error::Tsl2591Error;
 use crate::registers::{Gain, IntegrationTime, Persist, Register};
+use embedded_hal::delay::{self, DelayNs};
 use embedded_hal::i2c::I2c;
-use std::{thread, time::Duration};
 
 const TSL2591_FULLSPECTRUM: u8 = 0;
 const TSL2591_INFRARED: u8 = 1;
@@ -43,9 +43,11 @@ pub(crate) const TSL2591_LUX_COEFD: f32 = 0.86;
 ///
 /// This struct holds the I2C bus, sensor configuration, and state.
 /// It is generic over any I2C implementation that implements [`embedded_hal::i2c::I2c`].
-pub struct AdafruitTSL2591<I2C> {
+pub struct AdafruitTSL2591<I2C, D> {
     /// I2C bus instance
     i2c: I2C,
+    /// Delay provider for timing
+    delay: D,
     /// Sensor identifier (user-assignable)
     sensor_id: i32,
     /// Integration time setting
@@ -101,11 +103,12 @@ pub struct SensorInfo {
     pub resolution: f32,
 }
 
-impl<I2C: I2c> AdafruitTSL2591<I2C> {
+impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
     /// Constructor of [`AdafruitTSL2591`]
-    pub fn new(i2c: I2C, integration: IntegrationTime, gain: Gain, addr: u8) -> Self {
+    pub fn new(i2c: I2C, delay: D, integration: IntegrationTime, gain: Gain, addr: u8) -> Self {
         AdafruitTSL2591 {
             i2c,
+            delay,
             sensor_id: -1,
             integration,
             gain,
@@ -283,7 +286,7 @@ impl<I2C: I2c> AdafruitTSL2591<I2C> {
         // Wait x ms for ADC to complete
         let cycles: u8 = self.integration as u8 + 1;
         for _ in 0..cycles {
-            thread::sleep(Duration::from_millis(120));
+            self.delay.delay_ms(120);
         }
 
         // Empaqueted 32-bit result (lower 16 bits are full spectrum, upper 16 bits are infrared)
@@ -344,7 +347,7 @@ impl<I2C: I2c> AdafruitTSL2591<I2C> {
         );
         self.write8(
             crate::registers::TSL2591_COMMAND_BIT | Register::ThresholdAilth as u8,
-            Some(lower_threshold as u8 >> 8),
+            Some((lower_threshold >> 8) as u8),
         );
         self.write8(
             crate::registers::TSL2591_COMMAND_BIT | Register::ThresholdAihtl as u8,
@@ -352,7 +355,7 @@ impl<I2C: I2c> AdafruitTSL2591<I2C> {
         );
         self.write8(
             crate::registers::TSL2591_COMMAND_BIT | Register::ThresholdAihth as u8,
-            Some(upper_threshold as u8 >> 8),
+            Some((upper_threshold >> 8) as u8),
         );
 
         self.disable();
