@@ -34,30 +34,11 @@ Add to your `Cargo.toml`:
 tsl2591-rs = "0.1.1"
 ```
 
-## Quick Start (Current Public Surface)
+## Examples
 
-At the moment, the public constructor is available. A full end-to-end read example will be added as soon as the public methods for initialization and event reading are exposed.
+The `examples/` directory contains usage examples demonstrating various features of the driver. These examples are designed to run on a Raspberry Pi and can be cross-compiled from your development machine.
 
-```rust
-use tsl2591_rs::driver::AdafruitTSL2591;
-use tsl2591_rs::{Gain, IntegrationTime, TSL2591_ADDR};
-
-// `i2c` is any type implementing embedded_hal::i2c::I2c.
-// `delay` is any type implementing embedded_hal::delay::DelayNs.
-fn create_driver<I2C, D>(i2c: I2C, delay: D) -> AdafruitTSL2591<I2C, D>
-where
-  I2C: embedded_hal::i2c::I2c,
-  D: embedded_hal::delay::DelayNs,
-{
-  AdafruitTSL2591::new(
-    i2c,
-    delay,
-    IntegrationTime::OneHundredMS,
-    Gain::Medium,
-    TSL2591_ADDR,
-  )
-}
-```
+A convenience script is provided at the root of the project: `run_pi.sh`. It cross-compiles the selected example for `aarch64-unknown-linux-gnu` (Raspberry Pi 64-bit), copies it to the target device via SSH, and executes it remotely. See the script for required environment variables (`PI_USER`, `PI_HOST`, `PI_PATH`).
 
 ## Roadmap
 

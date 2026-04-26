@@ -9,6 +9,8 @@
 //! If you find this useful, consider supporting Adafruit's open source hardware:
 //! <https://www.adafruit.com/products/1980>
 
+use std::fmt;
+
 /// Errors that can occur when interacting with the TSL2591 sensor
 #[derive(Debug)]
 pub enum Tsl2591Error<E> {
@@ -32,3 +34,11 @@ pub enum Tsl2591Error<E> {
     /// Try reducing gain or integration time.
     Overflow,
 }
+
+impl<E: fmt::Debug> fmt::Display for Tsl2591Error<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl<E: fmt::Debug> std::error::Error for Tsl2591Error<E> {}
