@@ -1,2 +1,4 @@
 /target
 .env
+run_pi.sh
+Cross.toml

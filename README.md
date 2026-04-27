@@ -34,22 +34,37 @@ Add to your `Cargo.toml`:
 tsl2591-rs = "0.1.1"
 ```
 
-## Examples
+## Usage
 
-The `examples/` directory contains usage examples demonstrating various features of the driver. These examples are designed to run on a Raspberry Pi and can be cross-compiled from your development machine.
+Initialize the driver and read sensor data:
 
-A convenience script is provided at the root of the project: `run_pi.sh`. It cross-compiles the selected example for `aarch64-unknown-linux-gnu` (Raspberry Pi 64-bit), copies it to the target device via SSH, and executes it remotely. See the script for required environment variables (`PI_USER`, `PI_HOST`, `PI_PATH`).
+```rust
+use tsl2591_rs::{AdafruitTSL2591, Gain, IntegrationTime};
+use embedded_hal::i2c::I2c;
+use embedded_hal::delay::DelayNs;
+
+let mut sensor = AdafruitTSL2591::new(
+    i2c,
+    delay,
+    IntegrationTime::OneHundredMS,
+    Gain::Medium,
+    0x29, // default I2C address
+);
+
+// Initialize and probe the sensor
+sensor.begin()?;
+
+// Read sensor data
+let reading = sensor.get_event()?;
+println!("Lux: {}, Full: {}, IR: {}", reading.lux, reading.full_spectrum, reading.infrared);
+```
 
 ## Roadmap
 
-- Expose high-level public API:
-  - `begin`/device probe
-  - gain and integration-time setters/getters
-  - raw channel reads
-  - lux/event read
+- Expose gain and integration-time setters/getters as public API
+- Expose raw channel reads as public API
 - Improve error propagation for I2C operations
 - Add integration tests with hardware and/or mocks
-- Add complete usage examples
 
 ## Development
 
