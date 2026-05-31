@@ -3,11 +3,10 @@ use std::time::{Duration, Instant};
 use tsl2591_rs::{AdafruitTSL2591, Gain, IntegrationTime, TSL2591_ADDR, driver::SensorReading};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let i2c = I2cdev::new("/dev/i2c-1")?;
-    let mut delay = Delay;
-    let mut sensor = AdafruitTSL2591::new(
+    let i2c: I2cdev = I2cdev::new("/dev/i2c-1")?;
+    let mut sensor: AdafruitTSL2591<I2cdev, Delay> = AdafruitTSL2591::new(
         i2c,
-        delay,
+        Delay,
         IntegrationTime::OneHundredMS,
         Gain::Medium,
         TSL2591_ADDR,
