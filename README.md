@@ -31,12 +31,12 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tsl2591-rs = "0.1.1"
+tsl2591-rs = "0.1.2"
 ```
 
-## Usage
+## Examples
 
-Initialize the driver and read sensor data:
+Basic example usage:
 
 ```rust
 use tsl2591_rs::{AdafruitTSL2591, Gain, IntegrationTime};
@@ -57,6 +57,30 @@ sensor.begin()?;
 // Read sensor data
 let reading = sensor.get_event()?;
 println!("Lux: {}, Full: {}, IR: {}", reading.lux, reading.full_spectrum, reading.infrared);
+```
+
+You can find example usage in the `examples/` directory of this repository, demonstrating how to initialize the sensor, configure settings, and read lux values.
+
+```
+examples/
+├── basic.rs
+└── websocket.rs
+```
+
+Use `cargo run --example basic` to run the basic example, and `cargo run --example websocket` for the WebSocket server example.
+
+## Optional Features
+
+| Feature | Description                                          |
+| ------- | ---------------------------------------------------- |
+| `serde` | Derives `Serialize`/`Deserialize` on `SensorReading` |
+| `async` | Enables async support via `embedded-hal-async`       |
+
+Enable them in your `Cargo.toml`:
+
+```toml
+[dependencies]
+tsl2591-rs = { version = "0.1.2", features = ["serde", "async"] }
 ```
 
 ## Roadmap
