@@ -64,6 +64,7 @@ pub struct AdafruitTSL2591<I2C, D> {
 ///
 /// Returned by [`get_event`](AdafruitTSL2591::get_event) after a successful measurement.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SensorReading {
     /// Calculated illuminance in lux
     pub lux: f32,
@@ -465,5 +466,24 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
             min_value: 0.0,
             resolution: 0.001,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_sensor_reading_serialize() {
+        let reading = SensorReading {
+            lux: 100.0,
+            full_spectrum: 1000,
+            infrared: 200,
+        };
+        let bytes = bincode::serde::encode_to_vec(&reading, bincode::config::standard()).unwrap();
+        let (decoded, _): (SensorReading, _) =
+            bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+        assert_eq!(reading, decoded);
     }
 }

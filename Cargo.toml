@@ -13,6 +13,24 @@ categories = ["embedded", "hardware-support", "no-std"]
 [dependencies]
 embedded-hal = "1.0"
 embedded-hal-async = { version = "1.0.0", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+serde = ["dep:serde"]
+async = ["dep:embedded-hal-async"]
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 linux-embedded-hal = "0.4"
+
+[[example]]
+name = "websocket"
+required-features = ["serde"]
+
+[[example]]
+name = "basic"
+
+[dev-dependencies]
+tokio-tungstenite = "0.29"
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+bincode = "2"
