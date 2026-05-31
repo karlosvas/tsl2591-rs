@@ -268,11 +268,7 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
     /// # Returns
     ///
     /// Lux value based on AMS coefficients, or [`Tsl2591Error::Overflow`] if sensor is saturated
-    fn calculate_lux(
-        &mut self,
-        ch0: u16,
-        ch1: u16,
-    ) -> Result<f32, Tsl2591Error<Tsl2591Error<I2C::Error>>> {
+    fn calculate_lux(&mut self, ch0: u16, ch1: u16) -> Result<f32, Tsl2591Error<I2C::Error>> {
         if (ch0 == 0xFFFF) || (ch1 == 0xFFFF) {
             return Err(Tsl2591Error::Overflow);
         }
@@ -428,7 +424,7 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
     /// # Return
     ///
     /// True on success, False on failure
-    pub fn get_event(&mut self) -> Result<SensorReading, Tsl2591Error<Tsl2591Error<I2C::Error>>> {
+    pub fn get_event(&mut self) -> Result<SensorReading, Tsl2591Error<I2C::Error>> {
         self.get_full_luminosity();
         // Early silicon seems to have issues when there is a sudden jump in */
         // light levels. :( To work around this for now sample the sensor 2x */
