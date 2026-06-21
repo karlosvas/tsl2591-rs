@@ -28,11 +28,11 @@
 //! // let reading = sensor.get_event().unwrap();
 //! // println!("Lux: {:.2}", reading.lux);
 //! ```
+#![no_std]
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 pub mod driver;
 mod error;
 mod registers;
-
 pub use crate::driver::AdafruitTSL2591;
-pub use crate::registers::{Gain, IntegrationTime, Persist, TSL2591_ADDR};
+pub use crate::registers::{Gain, IntegrationTime, Persist, Register, TSL2591_ADDR};

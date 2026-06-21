@@ -195,18 +195,20 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
 
         self.i2c
             .write_read(self.addr, &write_buf, &mut read_buf)
-            .map_err(Tsl2591Error::I2c);
+            .map_err(Tsl2591Error::I2c)?;
 
         Ok(read_buf[0])
     }
 
-    fn read16(&mut self, register: u8) -> u16 {
+    fn read16(&mut self, register: u8) -> Result<u16, Tsl2591Error<I2C::Error>> {
         let write_buf: [u8; 1] = [register];
         let mut read_buf: [u8; 2] = [0u8; 2];
 
-        self.i2c.write_read(self.addr, &write_buf, &mut read_buf);
+        self.i2c
+            .write_read(self.addr, &write_buf, &mut read_buf)
+            .map_err(Tsl2591Error::I2c)?;
 
-        (read_buf[1] as u16) << 8 | (read_buf[0] as u16)
+        Ok((read_buf[1] as u16) << 8 | (read_buf[0] as u16))
     }
 
     /// Enables the chip, so it's ready to take readings
@@ -299,9 +301,21 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
         // float lux2 = ( ( TSL2591_LUX_COEFC * (float)ch0 ) - ( TSL2591_LUX_COEFD *
         // (float)ch1 ) ) / cpl; lux = lux1 > lux2 ? lux1 : lux2;
 
+        // Total darkness: with ch0 == 0 the ratio ch1/ch0 is 0/0 (NaN) or x/0
+        // (Inf), which would poison every downstream consumer (NaN propagates
+        // through comparisons and math silently). There is no visible light to
+        // report anyway.
+        if ch0 == 0 {
+            return Ok(0.0);
+        }
+
         // Alternate lux calculation 1
         // See: https://github.com/adafruit/Adafruit_TSL2591_Library/issues/14
         let lux: f32 = (ch0 as f32 - ch1 as f32) * (1.0 - (ch1 as f32 / ch0 as f32)) / cpl;
+
+        // With very low counts the IR channel can exceed the full-spectrum
+        // channel (sensor noise), driving the formula negative.
+        let lux: f32 = lux.max(0.0);
 
         // Alternate lux calculation 2
         // lux = ( (float)ch0 - ( 1.7F * (float)ch1 ) ) / cpl;
@@ -312,7 +326,7 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
 
     /// Reads the raw data from both light channels
     /// 32-bit raw count where high word is IR, low word is IR+Visible
-    fn get_full_luminosity(&mut self) -> u32 {
+    fn get_full_luminosity(&mut self) -> Result<u32, Tsl2591Error<I2C::Error>> {
         self.enable();
 
         // Wait x ms for ADC to complete
@@ -325,14 +339,14 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
         let mut full_spectrum: u32;
         let infrared: u16;
         full_spectrum =
-            self.read16(crate::registers::TSL2591_COMMAND_BIT | Register::Chan0Low as u8) as u32;
-        infrared = self.read16(crate::registers::TSL2591_COMMAND_BIT | Register::Chan1Low as u8);
+            self.read16(crate::registers::TSL2591_COMMAND_BIT | Register::Chan0Low as u8)? as u32;
+        infrared = self.read16(crate::registers::TSL2591_COMMAND_BIT | Register::Chan1Low as u8)?;
 
         full_spectrum |= (infrared as u32) << 16;
 
         self.disable();
 
-        full_spectrum
+        Ok(full_spectrum)
     }
 
     /// Reads the raw data from the channel
@@ -344,23 +358,23 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
     /// # Returns
     ///
     /// 16-bit raw count, or 0 if channel is invalid
-    fn get_luminosity(&mut self, channel: u8) -> u16 {
-        let full_luminosity: u32 = self.get_full_luminosity();
+    fn get_luminosity(&mut self, channel: u8) -> Result<u16, Tsl2591Error<I2C::Error>> {
+        let full_luminosity: u32 = self.get_full_luminosity()?;
 
         match channel {
             TSL2591_FULLSPECTRUM => {
                 // Reads two byte value from channel 0 (full spectrum)
-                (full_luminosity & 0xFFFF) as u16
+                Ok((full_luminosity & 0xFFFF) as u16)
             }
             TSL2591_INFRARED => {
                 // Reads two byte value from channel 1 (infrared)
-                (full_luminosity >> 16) as u16
+                Ok((full_luminosity >> 16) as u16)
             }
             TSL2591_VISIBLE => {
                 // Reads all and subtracts out just the visible!
-                ((full_luminosity & 0xFFFF) - (full_luminosity >> 16)) as u16
+                Ok(((full_luminosity & 0xFFFF) - (full_luminosity >> 16)) as u16)
             }
-            _ => 0, // unknown channel!
+            _ => Err(Tsl2591Error::InvalidDevice(channel)), // unknown channel!
         }
     }
 
@@ -428,7 +442,7 @@ impl<I2C: I2c, D: DelayNs> AdafruitTSL2591<I2C, D> {
         self.get_full_luminosity();
         // Early silicon seems to have issues when there is a sudden jump in */
         // light levels. :( To work around this for now sample the sensor 2x */
-        let lum: u32 = self.get_full_luminosity();
+        let lum: u32 = self.get_full_luminosity()?;
 
         let ir: u16 = (lum >> 16) as u16;
         let full: u16 = (lum & 0xFFFF) as u16;

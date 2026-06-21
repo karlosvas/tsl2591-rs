@@ -42,7 +42,7 @@ pub enum Register {
     Enable = 0x00,
     /// Control register
     Control = 0x01,
-    // ALS low threshold lower byte
+    /// ALS low threshold lower byte
     ThresholdAiltl = 0x04,
     /// ALS low threshold upper byte
     ThresholdAilth = 0x05,
