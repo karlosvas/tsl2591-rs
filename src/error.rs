@@ -9,7 +9,8 @@
 //! If you find this useful, consider supporting Adafruit's open source hardware:
 //! <https://www.adafruit.com/products/1980>
 
-use std::fmt;
+use core::error::Error;
+use core::fmt;
 
 /// Errors that can occur when interacting with the TSL2591 sensor
 #[derive(Debug)]
@@ -33,6 +34,11 @@ pub enum Tsl2591Error<E> {
     /// The light level is too high to be represented (value reached `0xFFFF`).
     /// Try reducing gain or integration time.
     Overflow,
+
+    /// # Returns
+    ///
+    /// 16-bit raw count, or `Tsl2591Error::InvalidChannel` if channel is invalid
+    InvalidChannel(u8),
 }
 
 impl<E: fmt::Debug> fmt::Display for Tsl2591Error<E> {
@@ -41,4 +47,4 @@ impl<E: fmt::Debug> fmt::Display for Tsl2591Error<E> {
     }
 }
 
-impl<E: fmt::Debug> std::error::Error for Tsl2591Error<E> {}
+impl<E: fmt::Debug> Error for Tsl2591Error<E> {}
